@@ -145,6 +145,4 @@ For information about maintenance and support for SDK major versions and their u
 More Resources
 --------------
 
-* `NOTICE <https://github.com/boto/boto3/blob/develop/NOTICE>`__
-* `Changelog <https://github.com/boto/boto3/blob/develop/CHANGELOG.rst>`__
-* `License <https://github.com/boto/boto3/blob/develop/LICENSE>`__
+* `License <https://github.com/Sairaj26-tech/AWS_Cloud_Servies_project/blob/main/boto3-develop/LICENSE>`__
