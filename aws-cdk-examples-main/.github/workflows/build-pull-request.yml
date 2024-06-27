@@ -1,0 +1,113 @@
+# Name of the workflow
+name: Build Pull Request
+
+# Trigger the workflow on pull requests
+on:
+  pull_request:
+    # Only run the workflow when non-Markdown files are changed
+    paths:
+      - '**'
+
+jobs:
+
+  build:
+    # Run the job on the latest Ubuntu runner
+    runs-on: ubuntu-latest
+
+    # Define a matrix strategy to run the job for multiple languages
+    strategy:
+      matrix:
+        language: ['csharp', 'go', 'python', 'java', 'typescript']
+
+    steps:
+      # Checkout the code from the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up the required environment for the specified language
+      - name: Setup Language
+        uses: ./.github/actions/setup-language
+        with:
+          language: ${{ matrix.language }}
+
+      # Get the list of changed files, excluding Markdown files
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+        with:
+          files: ${{ matrix.language }}/**
+          files_ignore: '**/*.md'
+
+      # Build the changed files for the specified language
+      - name: Build changed files
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          # Function to build a single file
+          build_file() {
+            echo "Build File $1"
+            local file="$1"
+            IFS="/" read -ra path_parts <<< "$file"
+            language=${path_parts[0]}
+
+            # Skip files that don't belong to the current language
+            if [[ $language != ${{ matrix.language }} ]]; then
+              return 0
+            fi
+
+            echo "Build Path $file"
+
+            # Run the build script for the current language, passing the project directory and extra path
+            echo "::group::$file"
+            if ../scripts/build-${language}.sh "$file"; then
+              echo "::endgroup::"
+            else
+              echo "::endgroup::"
+              echo "::error::Build failed for $file"
+              return 1
+            fi
+          }
+
+          # Export the build_file function for use in parallel
+          export -f build_file
+
+          # Create an array to store directories to be built
+          apps_to_build=()
+
+          files=(${{ steps.changed-files.outputs.all_modified_files }})
+
+          # Check the directories of each changed file for cdk.json
+          for file in "${files[@]}"; do
+            IFS="/" read -ra path_parts <<< "$file"
+            language=${path_parts[0]}
+            dir="${path_parts[0]}/${path_parts[1]}"
+
+            # Skip files that don't belong to the current language
+            if [[ $language != ${{ matrix.language }} ]]; then
+              continue
+            fi
+
+            apps_to_build+=("$(find "$dir" -name 'cdk.json')")
+          done
+
+          # Remove duplicate projects
+          apps_to_build=($(printf "%s\n" "${apps_to_build[@]}" | sort -u))
+
+          # Print the projects to be built
+          echo "projects to build:"
+          for dir in "${apps_to_build[@]}"; do
+            echo "- $dir"
+          done
+
+          # Change to language directory
+          cd ./${{ matrix.language }}
+
+          # install CDK CLI from npm if not typescript, so that npx can find it later
+          # ts will use the one from the particular cdk app
+          if [[ ${{ matrix.language }} != 'typescript' ]]; then
+            npm install -g aws-cdk
+            npx cdk --version
+          fi
+
+          # Run the build_file function in parallel for each project to be built
+          # Halt the execution if any of the build_file invocations fail
+          parallel --keep-order --halt-on-error 2 build_file ::: "${apps_to_build[@]}"
