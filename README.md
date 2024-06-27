@@ -24,7 +24,7 @@ This repo contains examples in each language supported by the CDK. Some language
 
 | Language | JSII Language-Stability |
 |----------|-------------------------|
-| [Typescript Examples]([https://github.com/aws-samples/aws-cdk-examples/tree/master/typescript](https://github.com/Sairaj26-tech/AWS_Cloud_Servies_project/tree/main/aws-cdk-examples-main/typescript)) | _Stable_ |
+| [Typescript Examples]([https://github.com/Sairaj26-tech/AWS_Cloud_Servies_project/tree/main/aws-cdk-examples-main/typescript]) | _Stable_ |
 | [Python Examples](https://github.com/aws-samples/aws-cdk-examples/tree/master/python) | _Stable_ |
 | [.NET Examples](https://github.com/aws-samples/aws-cdk-examples/tree/master/csharp) | _Stable_ |
 | [Java Examples](https://github.com/aws-samples/aws-cdk-examples/tree/master/java) | _Stable_ |
