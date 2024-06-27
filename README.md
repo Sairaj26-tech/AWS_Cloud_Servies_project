@@ -22,14 +22,6 @@ This is considered an intermediate learning resource and should typically be ref
 ## Examples <a name="Examples"></a>
 This repo contains examples in each language supported by the CDK. Some languages are fully supported by [JSII](https://github.com/aws/jsii), but as additional languages are added, you will see those marked as `Developer Preview`. You can find the examples for each of those languages at the following links:
 
-| Language | JSII Language-Stability |
-|----------|-------------------------|
-| [Typescript Examples]([https://github.com/Sairaj26-tech/AWS_Cloud_Servies_project/tree/main/typescript]) | _Stable_ | 
-| [Python Examples](https://github.com/aws-samples/aws-cdk-examples/tree/master/python) | _Stable_ |
-| [.NET Examples](https://github.com/aws-samples/aws-cdk-examples/tree/master/csharp) | _Stable_ |
-| [Java Examples](https://github.com/aws-samples/aws-cdk-examples/tree/master/java) | _Stable_ |
-| [Go Examples](https://github.com/aws-samples/aws-cdk-examples/tree/master/go) | _Stable_ |
-
 
 ## Learning Resources <a name="Learning"></a>
 While this is an excellent learning resource for the CDK, there are other resources that can be referenced to assist with your learning/development process.
