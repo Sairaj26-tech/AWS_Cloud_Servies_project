@@ -1,6 +1,6 @@
 # Extract Snippets for GitHub Actions
 
-Jerry Kindall, Amazon Web Services  
+Sai Raj S V, Amazon Web Services  
 Last updated 4-Jun-2021
 
 ## What it is
