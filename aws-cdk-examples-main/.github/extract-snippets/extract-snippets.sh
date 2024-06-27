@@ -1,5 +1,5 @@
 # extract-snippets.sh v1.1.0
-# Jerry Kindall, Amazon Web Services
+# Sai Raj S V, Amazon Web Services
 
 # this script manages updating of snippets found in source code to the snippets branch
 
