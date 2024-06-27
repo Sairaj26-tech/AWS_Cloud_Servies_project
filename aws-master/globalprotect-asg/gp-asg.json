@@ -1,0 +1,1175 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "GlobalProtect AutoScalling Demo.",
+    "Parameters": {
+        "ServerKeyName": {
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+        },
+        "PortalBootstrapBucketName": {
+            "Description": "Bucket name for GP Portal bootstrap configuration",
+            "Type": "String"
+        },
+        "GatewayBootstrapBucketName": {
+            "Description": "Bucket name for GP Gateway bootstrap configuration",
+            "Type": "String"
+        },
+        "LambdaBucketName": {
+            "Description": "Bucket name where lambda scripts reside",
+            "Type": "String"
+        },
+        "AZchoice": {
+            "Description": "Choose your region",
+            "Type": "AWS::EC2::AvailabilityZone::Name"
+        },
+        "FirewallAMI": {
+            "Description": "Input the firewall AMI ID. https://docs.paloaltonetworks.com/compatibility-matrix/vm-series-firewalls/aws-cft-amazon-machine-images-ami-list",
+            "Type": "AWS::EC2::Image::Id"
+        },
+        "InstanceTypePortal": {
+            "Description": "EC2 instance type for the Portal, C5/M5 requires v9.x",
+            "Type": "String",
+            "Default": "c5.2xlarge",
+            "AllowedValues": [
+                "c5.xlarge",
+                "c5.2xlarge",
+                "c5.4xlarge",
+                "c5.9xlarge",
+                "c5.18xlarge",
+                "c5n.xlarge",
+                "c5n.2xlarge",
+                "c5n.4xlarge",
+                "c5n.9xlarge",
+                "c5n.18xlarge",
+                "m5.xlarge",
+                "m5.2xlarge",
+                "m5.4xlarge",
+                "m5.12xlarge",
+                "m5.24xlarge",
+                "m5n.xlarge",
+                "m5n.2xlarge",
+                "m5n.4xlarge",
+                "m5n.8xlarge",
+                "c4.xlarge",
+                "c4.2xlarge",
+                "c4.4xlarge",
+                "c4.8xlarge",
+                "m4.xlarge",
+                "m4.2xlarge",
+                "m4.4xlarge",
+                "c3.xlarge",
+                "c3.2xlarge",
+                "c3.4xlarge",
+                "c3.8xlarge",
+                "m3.xlarge",
+                "m3.2xlarge"
+            ],
+            "ConstraintDescription": "must be a valid EC2 instance type."
+        },
+        "InstanceTypeGateway": {
+            "Description": "EC2 instance type for the Gateways, C5/M5 requires v9.x",
+            "Type": "String",
+            "Default": "c5.2xlarge",
+            "AllowedValues": [
+                "c5.xlarge",
+                "c5.2xlarge",
+                "c5.4xlarge",
+                "c5.9xlarge",
+                "c5.18xlarge",
+                "c5n.xlarge",
+                "c5n.2xlarge",
+                "c5n.4xlarge",
+                "c5n.9xlarge",
+                "c5n.18xlarge",
+                "m5.xlarge",
+                "m5.2xlarge",
+                "m5.4xlarge",
+                "m5.12xlarge",
+                "m5.24xlarge",
+                "m5n.xlarge",
+                "m5n.2xlarge",
+                "m5n.4xlarge",
+                "m5n.8xlarge",
+                "c4.xlarge",
+                "c4.2xlarge",
+                "c4.4xlarge",
+                "c4.8xlarge",
+                "m4.xlarge",
+                "m4.2xlarge",
+                "m4.4xlarge",
+                "c3.xlarge",
+                "c3.2xlarge",
+                "c3.4xlarge",
+                "c3.8xlarge",
+                "m3.xlarge",
+                "m3.2xlarge"
+            ],
+            "ConstraintDescription": "must be a valid EC2 instance type."
+        }
+    },
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "Firewall Parameters"
+                    },
+                    "Parameters": [
+                        "ServerKeyName",
+                        "AZchoice",
+                        "FirewallAMI",
+                        "InstanceTypePortal",
+                        "InstanceTypeGateway"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Amazon Configuration"
+                    },
+                    "Parameters": [
+                        "PortalBootstrapBucketName",
+                        "GatewayBootstrapBucketName",
+                        "LambdaBucketName"
+                    ]
+                }
+            ]
+        }
+    },
+    "Resources": {
+        "PortalBSRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "ec2.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "PortalBSRolePolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "s3:ListBucket",
+                                    "Resource": {
+                                        "Fn::Join": [
+                                            "",
+                                            [
+                                                "arn:aws:s3:::",
+                                                {
+                                                    "Ref": "PortalBootstrapBucketName"
+                                                }
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "s3:GetObject",
+                                    "Resource": {
+                                        "Fn::Join": [
+                                            "",
+                                            [
+                                                "arn:aws:s3:::",
+                                                {
+                                                    "Ref": "PortalBootstrapBucketName"
+                                                },
+                                                "/*"
+                                            ]
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "PortalBSInstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "PortalBSRole"
+                    }
+                ]
+            }
+        },
+        "GatewayBSRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "ec2.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "GatewayBSRolePolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "s3:ListBucket",
+                                    "Resource": {
+                                        "Fn::Join": [
+                                            "",
+                                            [
+                                                "arn:aws:s3:::",
+                                                {
+                                                    "Ref": "GatewayBootstrapBucketName"
+                                                }
+                                            ]
+                                        ]
+                                    }
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "s3:GetObject",
+                                    "Resource": {
+                                        "Fn::Join": [
+                                            "",
+                                            [
+                                                "arn:aws:s3:::",
+                                                {
+                                                    "Ref": "GatewayBootstrapBucketName"
+                                                },
+                                                "/*"
+                                            ]
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "GatewayBSInstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "GatewayBSRole"
+                    }
+                ]
+            }
+        },
+        "LambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "lambda.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "LambdaExecutionRolePolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Resource": "*",
+                                    "Action": [
+                                        "ec2:*"
+                                    ]
+                                },
+                                {
+                                    "Resource": "arn:aws:logs:*:*:*",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents"
+                                    ]
+                                },
+                                {
+                                    "Resource": "*",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "events:*"
+                                    ]
+                                },
+                                {
+                                    "Resource": "*",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "autoscaling:*"
+                                    ]
+                                },
+                                {
+                                    "Resource": "*",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "lambda:*"
+                                    ]
+                                },
+                                {
+                                    "Resource": "*",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "iam:*"
+                                    ]
+                                },
+                                {
+                                    "Resource": "*",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:*"
+                                    ]
+                                },
+                                {
+                                    "Resource": "*",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "cloudwatch:PutMetricData"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "AddENILambda": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Handler": "add_eni.add_eni_lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "LambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Code": {
+                    "S3Bucket": {
+                        "Ref": "LambdaBucketName"
+                    },
+                    "S3Key": "config_fw.zip"
+                },
+                "Runtime": "python3.8",
+                "Timeout": 100
+            }
+        },
+        "LambdaENISNSTopic": {
+            "Type": "AWS::SNS::Topic",
+            "Properties": {
+                "Subscription": [
+                    {
+                        "Endpoint": {
+                            "Fn::GetAtt": [
+                                "AddENILambda",
+                                "Arn"
+                            ]
+                        },
+                        "Protocol": "lambda"
+                    }
+                ]
+            }
+        },
+        "LambdaENIPermission": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "Action": "lambda:InvokeFunction",
+                "FunctionName": {
+                    "Fn::GetAtt": [
+                        "AddENILambda",
+                        "Arn"
+                    ]
+                },
+                "Principal": "sns.amazonaws.com",
+                "SourceArn": {
+                    "Ref": "LambdaENISNSTopic"
+                }
+            }
+        },
+        "ConfigGWLambda": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Handler": "config_gw.config_gw_lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "LambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Code": {
+                    "S3Bucket": {
+                        "Ref": "LambdaBucketName"
+                    },
+                    "S3Key": "config_fw.zip"
+                },
+                "Runtime": "python3.8",
+                "Timeout": 300
+            }
+        },
+        "ASGDemoVPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": "10.0.0.0/16",
+                "EnableDnsSupport": true,
+                "EnableDnsHostnames": true,
+                "InstanceTenancy": "default",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "GP Autoscaling VPC"
+                    }
+                ]
+            }
+        },
+        "ASGDemoPrivateSubnet": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "CidrBlock": "10.0.1.0/24",
+                "VpcId": {
+                    "Ref": "ASGDemoVPC"
+                },
+                "AvailabilityZone": {
+                    "Ref": "AZchoice"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ASG-PrivateSubnet"
+                    }
+                ]
+            }
+        },
+        "ASGDemoPrivateSubnetRT": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "ASGDemoVPC"
+                }
+            }
+        },
+        "PrivateSubnetAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "ASGDemoPrivateSubnetRT"
+                },
+                "SubnetId": {
+                    "Ref": "ASGDemoPrivateSubnet"
+                }
+            }
+        },
+        "PAVMAWSPrivateSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "SG for PA-VM-AWS internal interface",
+                "VpcId": {
+                    "Ref": "ASGDemoVPC"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "-1",
+                        "FromPort": -1,
+                        "ToPort": -1,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "SecurityGroupEgress": [
+                    {
+                        "IpProtocol": "-1",
+                        "FromPort": -1,
+                        "ToPort": -1,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ASG-PrivateSecurityGrp"
+                    }
+                ]
+            }
+        },
+        "ASGDemoPublicSubnet": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::GetAtt": [
+                        "ASGDemoPrivateSubnet",
+                        "AvailabilityZone"
+                    ]
+                },
+                "CidrBlock": "10.0.2.0/24",
+                "VpcId": {
+                    "Ref": "ASGDemoVPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ASG-PublicSubnet"
+                    }
+                ]
+            }
+        },
+        "ASGDemoPublicSubnetRT": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "ASGDemoVPC"
+                }
+            }
+        },
+        "PublicSubnetAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "ASGDemoPublicSubnetRT"
+                },
+                "SubnetId": {
+                    "Ref": "ASGDemoPublicSubnet"
+                }
+            },
+            "DependsOn": [
+                "ASGDemoPrivateSubnet"
+            ]
+        },
+        "ASGDemoIG": {
+            "Type": "AWS::EC2::InternetGateway"
+        },
+        "IGAttachment": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "InternetGatewayId": {
+                    "Ref": "ASGDemoIG"
+                },
+                "VpcId": {
+                    "Ref": "ASGDemoVPC"
+                }
+            }
+        },
+        "PublicDefaultRoute": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "ASGDemoIG"
+                },
+                "RouteTableId": {
+                    "Ref": "ASGDemoPublicSubnetRT"
+                }
+            },
+            "DependsOn": [
+                "IGAttachment"
+            ]
+        },
+        "ASGNotifierRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "autoscaling.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "ASGNotifierRolePolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "ASGNotifierRolePolicy",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "sns:Publish",
+                            "Resource": {
+                                "Ref": "LambdaENISNSTopic"
+                            }
+                        }
+                    ]
+                },
+                "Roles": [
+                    {
+                        "Ref": "ASGNotifierRole"
+                    }
+                ]
+            }
+        },
+        "SSHSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "SSH inbound allowed",
+                "VpcId": {
+                    "Ref": "ASGDemoVPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "SSH_ONLY"
+                    }
+                ],
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 22,
+                        "ToPort": 22,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "SecurityGroupEgress": [
+                    {
+                        "IpProtocol": "-1",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ]
+            }
+        },
+        "HTTPSSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "HTTPS inbound allowed",
+                "VpcId": {
+                    "Ref": "ASGDemoVPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "HTTPS_ONLY"
+                    }
+                ],
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 443,
+                        "ToPort": 443,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "SecurityGroupEgress": [
+                    {
+                        "IpProtocol": "-1",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ]
+            }
+        },
+        "PAVMAWSPublicSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "SG for PA-VM-AWS external interface",
+                "VpcId": {
+                    "Ref": "ASGDemoVPC"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "-1",
+                        "FromPort": -1,
+                        "ToPort": -1,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "SecurityGroupEgress": [
+                    {
+                        "IpProtocol": "-1",
+                        "FromPort": -1,
+                        "ToPort": -1,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ]
+            }
+        },
+        "GPPortalMgmtElasticIP": {
+            "Type": "AWS::EC2::EIP",
+            "Properties": {
+                "Domain": "vpc"
+            },
+            "DependsOn": [
+                "ASGDemoVPC"
+            ]
+        },
+        "GPPortalMgmtInterface": {
+            "Type": "AWS::EC2::NetworkInterface",
+            "Properties": {
+                "Description": "GP Portal mgmt",
+                "SubnetId": {
+                    "Ref": "ASGDemoPublicSubnet"
+                },
+                "SourceDestCheck": false,
+                "GroupSet": [
+                    {
+                        "Ref": "HTTPSSecurityGroup"
+                    },
+                    {
+                        "Ref": "SSHSecurityGroup"
+                    }
+                ]
+            }
+        },
+        "GPPortalMgmtEIPAssoc": {
+            "Type": "AWS::EC2::EIPAssociation",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "GPPortalMgmtElasticIP",
+                        "AllocationId"
+                    ]
+                },
+                "NetworkInterfaceId": {
+                    "Ref": "GPPortalMgmtInterface"
+                }
+            }
+        },
+        "GPPortalDPElasticIP": {
+            "Type": "AWS::EC2::EIP",
+            "Properties": {
+                "Domain": "vpc"
+            },
+            "DependsOn": [
+                "ASGDemoVPC"
+            ]
+        },
+        "GPPortalDPInterface": {
+            "Type": "AWS::EC2::NetworkInterface",
+            "Properties": {
+                "Description": "GP Portal DP",
+                "SubnetId": {
+                    "Ref": "ASGDemoPublicSubnet"
+                },
+                "SourceDestCheck": false,
+                "GroupSet": [
+                    {
+                        "Ref": "PAVMAWSPublicSecurityGroup"
+                    }
+                ]
+            }
+        },
+        "GPPortalDPEIPAssoc": {
+            "Type": "AWS::EC2::EIPAssociation",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "GPPortalDPElasticIP",
+                        "AllocationId"
+                    ]
+                },
+                "NetworkInterfaceId": {
+                    "Ref": "GPPortalDPInterface"
+                }
+            }
+        },
+        "GPPortalInstance": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "DisableApiTermination": false,
+                "IamInstanceProfile": {
+                    "Ref": "PortalBSInstanceProfile"
+                },
+                "InstanceInitiatedShutdownBehavior": "stop",
+                "EbsOptimized": true,
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/xvda",
+                        "Ebs": {
+                            "VolumeType": "gp2",
+                            "DeleteOnTermination": true,
+                            "VolumeSize": 60
+                        }
+                    }
+                ],
+                "ImageId": {
+                    "Ref": "FirewallAMI"
+                },
+                "InstanceType": {
+                    "Ref": "InstanceTypePortal"
+                },
+                "KeyName": {
+                    "Ref": "ServerKeyName"
+                },
+                "Monitoring": false,
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "GP-Portal"
+                    }
+                ],
+                "NetworkInterfaces": [
+                    {
+                        "NetworkInterfaceId": {
+                            "Ref": "GPPortalMgmtInterface"
+                        },
+                        "DeviceIndex": "0"
+                    },
+                    {
+                        "NetworkInterfaceId": {
+                            "Ref": "GPPortalDPInterface"
+                        },
+                        "DeviceIndex": "1"
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "vmseries-bootstrap-aws-s3bucket=",
+                                {
+                                    "Ref": "PortalBootstrapBucketName"
+                                }
+                            ]
+                        ]
+                    }
+                }
+            },
+            "DependsOn": [
+                "ASGDemoPublicSubnet"
+            ]
+        },
+        "InitPortalLambda": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "Handler": "init_portal.init_portal_lambda_handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "LambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Code": {
+                    "S3Bucket": {
+                        "Ref": "LambdaBucketName"
+                    },
+                    "S3Key": "config_fw.zip"
+                },
+                "Runtime": "python3.8",
+                "Timeout": 300
+            }
+        },
+        "GPPortalCustomResource": {
+            "Type": "AWS::CloudFormation::CustomResource",
+            "Version": "1.0",
+            "Properties": {
+                "ServiceToken": {
+                    "Fn::GetAtt": [
+                        "InitPortalLambda",
+                        "Arn"
+                    ]
+                },
+                "GPPortalMgmtIp": {
+                    "Ref": "GPPortalMgmtElasticIP"
+                },
+                "GPPortalDPIp": {
+                    "Ref": "GPPortalDPElasticIP"
+                },
+                "ASGName": {
+                    "Ref": "ASGDemo"
+                }
+            }
+        },
+        "ASGDemoLaunchConfiguration": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "KeyName": {
+                    "Ref": "ServerKeyName"
+                },
+                "AssociatePublicIpAddress": true,
+                "InstanceType": {
+                    "Ref": "InstanceTypeGateway"
+                },
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/xvda",
+                        "Ebs": {
+                            "VolumeType": "gp2",
+                            "DeleteOnTermination": true,
+                            "VolumeSize": 60
+                        }
+                    }
+                ],
+                "ImageId": {
+                    "Ref": "FirewallAMI"
+                },
+                "SecurityGroups": [
+                    {
+                        "Ref": "PAVMAWSPublicSecurityGroup"
+                    }
+                ],
+                "EbsOptimized": true,
+                "IamInstanceProfile": {
+                    "Ref": "GatewayBSInstanceProfile"
+                },
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "vmseries-bootstrap-aws-s3bucket=",
+                                {
+                                    "Ref": "GatewayBootstrapBucketName"
+                                }
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
+        "ASGDemo": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "LaunchConfigurationName": {
+                    "Ref": "ASGDemoLaunchConfiguration"
+                },
+                "MinSize": "0",
+                "MaxSize": "3",
+                "Cooldown": "600",
+                "HealthCheckGracePeriod": 600,
+                "NotificationConfigurations": [
+                    {
+                        "NotificationTypes": [
+                            "autoscaling:EC2_INSTANCE_LAUNCH",
+                            "autoscaling:EC2_INSTANCE_TERMINATE",
+                            "autoscaling:EC2_INSTANCE_LAUNCH_ERROR",
+                            "autoscaling:EC2_INSTANCE_TERMINATE_ERROR"
+                        ],
+                        "TopicARN": {
+                            "Ref": "LambdaENISNSTopic"
+                        }
+                    }
+                ],
+                "MetricsCollection": [
+                    {
+                        "Granularity": "1Minute",
+                        "Metrics": [
+                            "GroupMinSize",
+                            "GroupMaxSize"
+                        ]
+                    }
+                ],
+                "VPCZoneIdentifier": [
+                    {
+                        "Ref": "ASGDemoPublicSubnet"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "GP-Gateway",
+                        "PropagateAtLaunch": true
+                    }
+                ]
+            }
+        },
+        "ASGLifecycleHookL": {
+            "Type": "AWS::AutoScaling::LifecycleHook",
+            "Properties": {
+                "DefaultResult": "ABANDON",
+                "AutoScalingGroupName": {
+                    "Ref": "ASGDemo"
+                },
+                "LifecycleTransition": "autoscaling:EC2_INSTANCE_LAUNCHING",
+                "NotificationTargetARN": {
+                    "Ref": "LambdaENISNSTopic"
+                },
+                "RoleARN": {
+                    "Fn::GetAtt": [
+                        "ASGNotifierRole",
+                        "Arn"
+                    ]
+                },
+                "NotificationMetadata": {
+                    "Fn::Join": [
+                        ",",
+                        [
+                            {
+                                "Ref": "ASGDemoPublicSubnet"
+                            },
+                            {
+                                "Ref": "PAVMAWSPublicSecurityGroup"
+                            },
+                            {
+                                "Ref": "GPPortalMgmtElasticIP"
+                            },
+                            {
+                                "Ref": "ConfigGWLambda"
+                            },
+                            {
+                                "Ref": "LambdaBucketName"
+                            }
+                        ]
+                    ]
+                }
+            }
+        },
+        "ASGLifecycleHookT": {
+            "Type": "AWS::AutoScaling::LifecycleHook",
+            "Properties": {
+                "DefaultResult": "CONTINUE",
+                "AutoScalingGroupName": {
+                    "Ref": "ASGDemo"
+                },
+                "LifecycleTransition": "autoscaling:EC2_INSTANCE_TERMINATING",
+                "NotificationTargetARN": {
+                    "Ref": "LambdaENISNSTopic"
+                },
+                "RoleARN": {
+                    "Fn::GetAtt": [
+                        "ASGNotifierRole",
+                        "Arn"
+                    ]
+                },
+                "NotificationMetadata": {
+                    "Fn::Join": [
+                        ",",
+                        [
+                            {
+                                "Ref": "ASGDemoPublicSubnet"
+                            },
+                            {
+                                "Ref": "PAVMAWSPublicSecurityGroup"
+                            },
+                            {
+                                "Ref": "GPPortalMgmtElasticIP"
+                            },
+                            {
+                                "Ref": "ConfigGWLambda"
+                            },
+                            {
+                                "Ref": "LambdaBucketName"
+                            }
+                        ]
+                    ]
+                }
+            }
+        },
+        "MaxSessReachedAlarm": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmDescription": "Alarm if max number of sessions is over the treshold",
+                "AlarmName": "MAX_SESS_REACHED",
+                "AlarmActions": [
+                    {
+                        "Ref": "GPScalingUpPolicy"
+                    }
+                ],
+                "ComparisonOperator": "GreaterThanThreshold",
+                "MetricName": "ActiveSessions",
+                "Namespace": "GPGatewayMetrics",
+                "Period": 180,
+                "Statistic": "Average",
+                "Threshold": 20,
+                "Unit": "Count",
+                "EvaluationPeriods": 1,
+                "Dimensions": [
+                    {
+                        "Name": "AutoScalingGroupName",
+                        "Value": {
+                            "Ref": "ASGDemo"
+                        }
+                    }
+                ]
+            }
+        },
+        "MinSessReachedAlarm": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmDescription": "Alarm if min number of sessions is under the treshold",
+                "AlarmName": "MIN_SESS_REACHED",
+                "AlarmActions": [
+                    {
+                        "Ref": "GPScalingDownPolicy"
+                    }
+                ],
+                "ComparisonOperator": "LessThanThreshold",
+                "MetricName": "ActiveSessions",
+                "Namespace": "GPGatewayMetrics",
+                "Period": 300,
+                "Statistic": "Average",
+                "Threshold": 5,
+                "Unit": "Count",
+                "EvaluationPeriods": 3,
+                "Dimensions": [
+                    {
+                        "Name": "AutoScalingGroupName",
+                        "Value": {
+                            "Ref": "ASGDemo"
+                        }
+                    }
+                ]
+            }
+        },
+        "GPScalingUpPolicy": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AdjustmentType": "ChangeInCapacity",
+                "AutoScalingGroupName": {
+                    "Ref": "ASGDemo"
+                },
+                "ScalingAdjustment": 1,
+                "Cooldown": "600"
+            }
+        },
+        "GPScalingDownPolicy": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AdjustmentType": "ChangeInCapacity",
+                "AutoScalingGroupName": {
+                    "Ref": "ASGDemo"
+                },
+                "ScalingAdjustment": -1,
+                "Cooldown": "600"
+            }
+        }
+    },
+    "Outputs": {
+        "GPPortalPublicIP": {
+            "Value": {
+                "Ref": "GPPortalDPElasticIP"
+            },
+            "Description": "Global Protect Portal DataPlane IP"
+        },
+        "GPPortalMgmtPublicIP": {
+            "Value": {
+                "Ref": "GPPortalMgmtElasticIP"
+            },
+            "Description": "Global Protect Portal Mgmt IP"
+        }
+    }
+}
